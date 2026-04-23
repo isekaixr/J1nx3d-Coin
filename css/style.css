@@ -1,0 +1,39 @@
+body {
+  font-family: Arial;
+  background: #0f172a;
+  color: white;
+  padding: 20px;
+}
+
+h1 {
+  color: #38bdf8;
+}
+
+select {
+  padding: 8px;
+  border-radius: 6px;
+  margin-top: 10px;
+}
+
+#status {
+  margin-top: 10px;
+  opacity: 0.8;
+}
+
+#state {
+  margin-top: 10px;
+  font-weight: bold;
+  color: #a5b4fc;
+}
+
+#flow {
+  margin-top: 10px;
+  font-weight: bold;
+  color: #facc15;
+}
+
+canvas {
+  margin-top: 20px;
+  background: #111827;
+  border-radius: 10px;
+}
