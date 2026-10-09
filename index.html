@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>☩ Nova Terminal — Smart Money</title>
-  <link rel="stylesheet" href="./css/style.css?v=9" />
+  <link rel="stylesheet" href="./css/style.css?v=10" />
 </head>
 <body>
 
@@ -40,11 +40,16 @@
     </label>
   </div>
 
-  <div id="marketBar" class="marketbar glass">
-    <span id="fng">😨 Fear & Greed : …</span>
-    <span id="btcDom">₿ BTC : …</span>
-    <span class="hint">pas une machine à cash : le marché donne, le marché reprend ☩</span>
+  <div class="dash">
+    <div class="mcard"><h4>😨 Sentiment</h4><div id="fng" class="mval">…</div></div>
+    <div class="mcard"><h4>₿ Bitcoin</h4><div id="btcDom" class="mval">…</div></div>
+    <div class="mcard wide"><h4>💱 Devises <small>BCE</small></h4><div id="fxStrip" class="mval">…</div></div>
+    <div class="mcard"><h4>🛢️ Baril</h4><div id="oilStrip" class="mval">…</div></div>
+    <div class="mcard"><h4>🏦 ETF</h4><div id="etfStrip" class="mval">…</div></div>
+    <div class="mcard wide"><h4>🤪 Mèmes <small>24h / 7j</small></h4><div id="memeStrip" class="mval">…</div></div>
+    <div class="mcard wide"><h4>🖼️ NFT <small>floors ETH</small></h4><div id="nftStrip" class="mval">…</div></div>
   </div>
+  <p class="hint">Pas une machine à cash : le marché donne, le marché reprend ☩ — vert = chaud, rouge = froid.</p>
 
   <div id="topPick" class="toppick glass">
     <span class="toppick-title">🔥 Sur quoi miser :</span>
@@ -145,7 +150,7 @@
   <div class="risk-note">Bourse au comptant : pas de levier, horizon long. Indicatif, pas un conseil financier ☩</div>
 </section>
 
-<script src="./js/app.js?v=9"></script>
-<script src="./js/bourse.js?v=9"></script>
+<script src="./js/app.js?v=10"></script>
+<script src="./js/bourse.js?v=10"></script>
 </body>
 </html>

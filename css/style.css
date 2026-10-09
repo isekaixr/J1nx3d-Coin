@@ -64,6 +64,15 @@ body {
 
 .marketbar { padding: 8px 16px; margin: 12px 0; display: flex; gap: 18px; align-items: center; flex-wrap: wrap; font-size: 14px; }
 .marketbar .hint { margin: 0 0 0 auto; }
+.dash { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 12px 0; }
+.mcard { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; min-width: 0; }
+.mcard.wide { grid-column: span 2; }
+.mcard h4 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--mut); font-weight: bold; }
+.mcard h4 small { text-transform: none; letter-spacing: 0; opacity: 0.7; }
+.mval { font-size: 17px; font-weight: 800; line-height: 1.5; overflow-wrap: anywhere; }
+.mval small { font-size: 12px; font-weight: normal; color: var(--mut); }
+.mval .sub { display: block; font-size: 12px; font-weight: normal; color: var(--mut); }
+.mrow { display: flex; gap: 12px; flex-wrap: wrap; align-items: baseline; }
 .screener { padding: 12px 16px; margin-bottom: 12px; }
 .screener-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .screener-head button { background: transparent; border: 1px solid var(--line); border-radius: 8px; color: var(--txt); cursor: pointer; padding: 4px 10px; }

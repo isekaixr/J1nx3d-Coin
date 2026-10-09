@@ -619,6 +619,22 @@ async function refreshBubble() {
       b.addEventListener("click", () => loadPair(x.s.toLowerCase()));
       el.appendChild(b);
     });
+    // 7j en différé (ne bloque pas l'affichage 24h)
+    (async () => {
+      try {
+        const w7 = await Promise.all(pool.map(async (x) => {
+          try {
+            const k = await fetch(`https://api.binance.com/api/v3/klines?symbol=${x.s}&interval=1d&limit=8`).then((r) => r.json());
+            const now = parseFloat(k[k.length - 1][4]), old = parseFloat(k[0][4]);
+            return ((now - old) / old) * 100;
+          } catch { return null; }
+        }));
+        const pe = document.getElementById("bubblePick");
+        if (pe) pe.innerText = "⭐ Top 7 : " + pool.map((x, i) =>
+          `${medals[i]} ${x.s.replace("USDT", "")} ${x.chg >= 0 ? "+" : ""}${x.chg.toFixed(1)}%${w7[i] == null ? "" : ` (${w7[i] >= 0 ? "+" : ""}${w7[i].toFixed(0)}% 7j)`}`
+        ).join("  ");
+      } catch { /* silencieux */ }
+    })();
   } catch (e) {
     el.innerText = "bubble indisponible (réseau) — réessaie 🔄";
   }
@@ -646,17 +662,184 @@ async function refreshMarketBar() {
     const f = await fetch("https://api.alternative.me/fng/?limit=1&format=json").then((r) => r.json());
     const v = f?.data?.[0];
     if (v) {
-      const label = { "Extreme Fear": "😱 Peur extrême", Fear: "😨 Peur", Neutral: "😐 Neutre", Greed: "🤑 Gourmandise", "Extreme Greed": "🤪 Euphorie" }[v.value_classification] || v.value_classification;
-      document.getElementById("fng").innerText = `😨 Fear & Greed : ${v.value} — ${label}`;
+      const label = { "Extreme Fear": "Peur extrême", Fear: "Peur", Neutral: "Neutre", Greed: "Gourmandise", "Extreme Greed": "Euphorie" }[v.value_classification] || v.value_classification;
+      const mood = v.value >= 55 ? "pos" : v.value <= 45 ? "neg" : "";
+      document.getElementById("fng").innerHTML = `<span class="${mood}">${v.value}</span><span class="sub">${label}</span>`;
     }
-  } catch { document.getElementById("fng").innerText = "😨 Fear & Greed : n/a"; }
+  } catch { document.getElementById("fng").innerText = "n/a"; }
   try {
     const b = await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT').then((r) => r.json());
-    document.getElementById("btcDom").innerText = `₿ BTC ${parseFloat(b.lastPrice).toLocaleString("fr-FR", { maximumFractionDigits: 0 })}€-eq ${parseFloat(b.priceChangePercent) >= 0 ? "🟢" : "🔴"} ${parseFloat(b.priceChangePercent).toFixed(1)}% (24h)`;
+    const chg = parseFloat(b.priceChangePercent);
+    document.getElementById("btcDom").innerHTML = `${parseFloat(b.lastPrice).toLocaleString("fr-FR", { maximumFractionDigits: 0 })}$<span class="sub ${chg >= 0 ? "pos" : "neg"}">${chg >= 0 ? "+" : ""}${chg.toFixed(1)}% / 24h</span>`;
   } catch { /* silencieux */ }
 }
 setInterval(refreshMarketBar, 60000);
 refreshMarketBar();
+
+// 💱 DEVISES chaudes — forex ECB via Frankfurter (gratuit, CORS OK)
+async function refreshFx() {
+  const el = document.getElementById("fxStrip");
+  if (!el) return;
+  try {
+    const to = "USD,GBP,JPY,CHF";
+    const end = new Date().toISOString().slice(0, 10);
+    const start = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
+    const j = await fetch(`https://api.frankfurter.app/${start}..${end}?from=EUR&to=${to}`).then((r) => {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    });
+    const days = Object.keys(j.rates).sort();
+    if (days.length < 2) throw new Error("pas d'historique");
+    const last = j.rates[days[days.length - 1]], prev = j.rates[days[days.length - 2]];
+    const flags = { USD: "$", GBP: "£", JPY: "¥", CHF: "₣" };
+    el.innerHTML = '<div class="mrow">' + ["USD", "GBP", "JPY", "CHF"].map((k) => {
+      const v = last[k], chg = ((v - prev[k]) / prev[k]) * 100;
+      return `<span>EUR/${k} <b>${v.toFixed(k === "JPY" ? 1 : 4)}</b> <small class="${chg >= 0 ? "pos" : "neg"}">${chg >= 0 ? "+" : ""}${chg.toFixed(2)}%</small></span>`;
+    }).join("") + "</div>";
+  } catch (e) {
+    el.innerText = "n/a (réseau)";
+  }
+}
+setInterval(refreshFx, 300000);
+refreshFx();
+
+// 🛢️ BARIL — Brent/WTI : Yahoo tente en direct, sinon valeur seed manuelle (éditable)
+const OIL_SEED = {
+  brent: { ticker: "BZ=F", price: 104.09, date: "09/10/2026" },
+  wti: { ticker: "CL=F", price: 91.49, date: "09/10/2026" },
+};
+function oilManual() {
+  try { return JSON.parse(localStorage.getItem("oilManual") || "{}"); } catch { return {}; }
+}
+async function refreshOil() {
+  const el = document.getElementById("oilStrip");
+  if (!el) return;
+  const man = oilManual();
+  const out = {};
+  for (const [key, seed] of Object.entries(OIL_SEED)) {
+    let price = man[key] || seed.price, src = man[key] ? "manuel" : `seed ${seed.date}`;
+    try {
+      const j = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${seed.ticker}?interval=1d&range=5d`).then((r) => {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      });
+      const m = j?.chart?.result?.[0]?.meta;
+      if (m?.regularMarketPrice) { price = m.regularMarketPrice; src = "Yahoo live"; }
+    } catch { /* fallback seed/manuel, silencieux */ }
+    out[key] = { price, src };
+  }
+  el.innerHTML = `<div class="mrow"><span>Brent <b>${out.brent.price.toFixed(2)}$</b></span><span>WTI <b>${out.wti.price.toFixed(2)}$</b></span></div><span class="sub">${out.brent.src} <button id="oilEdit" title="mettre à jour manuellement">✏️</button></span>`;
+  document.getElementById("oilEdit")?.addEventListener("click", () => {
+    const b = prompt("Brent $ ?", String(out.brent.price));
+    const w = prompt("WTI $ ?", String(out.wti.price));
+    const m = oilManual();
+    if (b && isFinite(parseFloat(b))) m.brent = parseFloat(b);
+    if (w && isFinite(parseFloat(w))) m.wti = parseFloat(w);
+    localStorage.setItem("oilManual", JSON.stringify(m));
+    refreshOil();
+  });
+}
+setInterval(refreshOil, 300000);
+refreshOil();
+
+// 🏦 ETF — IBIT (BTC), ETHA (ETH), CAC.PA (CAC40) : Yahoo live ou seed 09/10/2026, éditable
+const ETF_SEED = [
+  { ticker: "IBIT", name: "BTC", price: 46.805, ccy: "$", date: "09/10/26" },
+  { ticker: "ETHA", name: "ETH", price: 56.295, ccy: "$", date: "09/10/26" },
+  { ticker: "CAC.PA", name: "CAC40", price: 78.96, ccy: "€", date: "09/10/26" },
+];
+function etfManual() {
+  try { return JSON.parse(localStorage.getItem("etfManual") || "{}"); } catch { return {}; }
+}
+async function refreshEtf() {
+  const el = document.getElementById("etfStrip");
+  if (!el) return;
+  const man = etfManual();
+  const rows = [];
+  for (const e of ETF_SEED) {
+    let price = man[e.ticker] ?? e.price, chg = null, src = man[e.ticker] != null ? "manuel" : e.date;
+    try {
+      const j = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(e.ticker)}?interval=1d&range=5d`).then((r) => {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      });
+      const m = j?.chart?.result?.[0]?.meta;
+      if (m?.regularMarketPrice) { price = m.regularMarketPrice; chg = m.regularMarketChangePercent; src = "live"; }
+    } catch { /* seed/manuel */ }
+    rows.push({ ...e, price, chg, src });
+  }
+  el.innerHTML = `<div class="mrow">` + rows.map((r) =>
+    `<span>${r.name} <b>${r.price.toFixed(2)}${r.ccy}</b> ${r.chg == null ? `<small>${r.src}</small>` : `<small class="${r.chg >= 0 ? "pos" : "neg"}">${r.chg >= 0 ? "+" : ""}${r.chg.toFixed(1)}%</small>`}</span>`
+  ).join("") + `</div><span class="sub"><button id="etfEdit">✏️ prix</button></span>`;
+  document.getElementById("etfEdit")?.addEventListener("click", () => {
+    const m = etfManual();
+    for (const e of ETF_SEED) {
+      const v = prompt(`${e.ticker} (${e.ccy}) ?`, String(m[e.ticker] ?? e.price));
+      if (v && isFinite(parseFloat(v))) m[e.ticker] = parseFloat(v);
+    }
+    localStorage.setItem("etfManual", JSON.stringify(m));
+    refreshEtf();
+  });
+}
+setInterval(refreshEtf, 300000);
+refreshEtf();
+
+// 🤪 MÈMES — les coins à la con, 24h + 7j (Binance, gratuit)
+// Oui on les voit déjà dans la bubble (PEPE, DOGE…) — ici c'est leur coin réservé avec la varia 7j.
+const MEMES = ["DOGEUSDT", "SHIBUSDT", "PEPEUSDT", "BONKUSDT", "WIFUSDT", "FLOKIUSDT", "PUMPUSDT"];
+async function refreshMeme() {
+  const el = document.getElementById("memeStrip");
+  if (!el) return;
+  try {
+    const sym = encodeURIComponent(JSON.stringify(MEMES));
+    const arr = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbols=${sym}`).then((r) => {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    });
+    const w7 = await Promise.all(arr.map(async (t) => {
+      try {
+        const k = await fetch(`https://api.binance.com/api/v3/klines?symbol=${t.symbol}&interval=1d&limit=8`).then((r) => r.json());
+        const old = parseFloat(k[0][4]), now = parseFloat(t.lastPrice);
+        return ((now - old) / old) * 100;
+      } catch { return null; }
+    }));
+    el.innerHTML = `<div class="mrow">` + arr.map((t, i) => {
+      const c24 = parseFloat(t.priceChangePercent), c7 = w7[i];
+      return `<button class="chip" data-p="${t.symbol.toLowerCase()}">${t.symbol.replace("USDT", "")} <small class="${c24 >= 0 ? "pos" : "neg"}">${c24 >= 0 ? "+" : ""}${c24.toFixed(1)}%</small><small> / ${c7 == null ? "7j n/a" : `${c7 >= 0 ? "+" : ""}${c7.toFixed(1)}% 7j`}</small></button>`;
+    }).join("") + "</div>";
+    el.querySelectorAll(".chip").forEach((c) => c.addEventListener("click", () => loadPair(c.dataset.p)));
+  } catch {
+    el.innerText = "n/a (réseau)";
+  }
+}
+setInterval(refreshMeme, 600000);
+refreshMeme();
+
+// 🖼️ NFT — floors ETH des œuvres revendues une folie (CoinGecko gratuit, best-effort)
+const NFTS = [
+  { id: "bored-ape-yacht-club", name: "BAYC" },
+  { id: "cryptopunks", name: "Punks" },
+  { id: "pudgy-penguins", name: "Pudgy" },
+];
+async function refreshNft() {
+  const el = document.getElementById("nftStrip");
+  if (!el) return;
+  try {
+    const rows = [];
+    for (const n of NFTS) {
+      const j = await fetch(`https://api.coingecko.com/api/v3/nfts/${n.id}`).then((r) => {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      });
+      rows.push(`<span>${n.name} <b>${Number(j.floor_price.native_currency).toFixed(1)}Ξ</b> <small>vol ${Number(j.volume_24h?.native_currency || 0).toFixed(0)}Ξ/24h</small></span>`);
+    }
+    el.innerHTML = `<div class="mrow">${rows.join("")}</div>`;
+  } catch {
+    el.innerHTML = `<span class="sub">limite gratuite atteinte — réessaie dans 1 min (les floors bougent peu de toute façon)</span>`;
+  }
+}
+setInterval(refreshNft, 1800000);
+refreshNft();
 
 // 📈 INDICATEURS — EMA12/26 + RSI14 (façon TradingView, light)
 function emaArr(values, period) {
