@@ -615,7 +615,8 @@ async function refreshBubble() {
       b.className = "bub" + (isTop ? " top" : "");
       b.style.fontSize = size + "px";
       b.style.background = `hsl(${x.chg >= 0 ? 140 : 0} 70% ${x.chg >= 0 ? 45 + Math.min(20, x.chg) : 60}%)`;
-      b.innerHTML = `${isTop ? medals[rank] + " " : ""}${x.s.replace("USDT", "")}<small>${x.chg >= 0 ? "+" : ""}${x.chg.toFixed(1)}%</small>`;
+      const flame = rank >= 0 && rank < 3 ? "🔥 " : "";
+      b.innerHTML = `${flame}${isTop ? medals[rank] + " " : ""}${x.s.replace("USDT", "")}<small>${x.chg >= 0 ? "+" : ""}${x.chg.toFixed(1)}%${rank === 0 ? " — À MISER" : ""}</small>`;
       b.title = `${isTop ? "TOP " + (rank + 1) + " à miser — " : ""}${x.s} : ${x.chg.toFixed(2)}% / vol ${(x.vol / 1e6).toFixed(1)}M — clic = charger`;
       b.addEventListener("click", () => loadPair(x.s.toLowerCase()));
       el.appendChild(b);
