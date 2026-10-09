@@ -544,33 +544,32 @@ function computeSignal() {
 
 setInterval(() => { try { computeSignal(); } catch {} }, 2000);
 
-// 🏆 TOP PICK — sur quoi miser (score 24h Binance)
-const PAIRS24 = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
+// 🏆 TOP PICK — sur quoi miser = les 3 plus chaudes du moment (score 24h, tout le spot)
+const STABLES = ["USDT", "USDC", "FDUSD", "TUSD", "DAI", "USDD", "BUSD"];
 async function refreshTopPick() {
   const el = document.getElementById("pickChips");
   if (!el) return;
   try {
-    const sym = encodeURIComponent(JSON.stringify(PAIRS24));
-    const res = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbols=${sym}`);
+    const res = await fetch("https://api.binance.com/api/v3/ticker/24hr");
     if (!res.ok) throw new Error("HTTP " + res.status);
     const arr = await res.json();
-    const scored = arr.map((t) => {
-      const chg = Math.abs(parseFloat(t.priceChangePercent));
-      const vol = parseFloat(t.quoteVolume);
-      const score = chg * Math.log10(vol + 10);
-      return { s: t.symbol, chg: parseFloat(t.priceChangePercent), vol, score, last: parseFloat(t.lastPrice) };
-    }).sort((a, b) => b.score - a.score);
-    const best = scored[0];
-    el.innerHTML = scored.map((x) => {
+    const scored = arr
+      .filter((t) => t.symbol.endsWith("USDT") && !STABLES.some((s) => t.symbol.startsWith(s)))
+      .map((t) => {
+        const chg = parseFloat(t.priceChangePercent);
+        const vol = parseFloat(t.quoteVolume);
+        return { s: t.symbol, chg, vol, score: Math.abs(chg) * Math.log10(vol + 10) };
+      })
+      .filter((t) => isFinite(t.chg) && isFinite(t.vol) && t.vol > 1000000 && t.chg > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3);
+    const medalsPick = ["🥇", "🥈", "🥉"];
+    el.innerHTML = scored.map((x, i) => {
       const cur = x.s.toLowerCase() === currentPair;
-      const isBest = x.s === best.s;
-      return `<button class="chip ${isBest ? "pick" : ""}" data-p="${x.s.toLowerCase()}">${isBest ? "⭐ " : ""}${x.s.replace("USDT", "")} <small>${x.chg >= 0 ? "+" : ""}${x.chg.toFixed(1)}%${cur ? " • live" : ""}</small></button>`;
-    }).join(" ");
+      return `<button class="chip ${i === 0 ? "pick" : ""}" data-p="${x.s.toLowerCase()}">${i === 0 ? "⭐ " : medalsPick[i] + " "}${x.s.replace("USDT", "")} <small>${x.chg >= 0 ? "+" : ""}${x.chg.toFixed(1)}%${cur ? " • live" : ""}</small></button>`;
+    }).join(" ") + `<small class="hint"> + live : ${currentPair.toUpperCase()}</small>`;
     el.querySelectorAll(".chip").forEach((c) => c.addEventListener("click", () => {
-      select.value = c.dataset.p;
-      currentPair = c.dataset.p;
-      connect(currentPair);
-      refreshTopPick();
+      loadPair(c.dataset.p);
     }));
   } catch (e) {
     el.innerText = "top indisponible (réseau) — reste sur " + currentPair.toUpperCase();
@@ -580,7 +579,6 @@ setInterval(refreshTopPick, 30000);
 refreshTopPick();
 
 // 🫧 BUBBLE SCREENER — top USDT 24h façon crypto-bubble (clic = charger)
-const STABLES = ["USDT", "USDC", "FDUSD", "TUSD", "DAI", "USDD", "BUSD"];
 async function refreshBubble() {
   const el = document.getElementById("bubble");
   if (!el) return;
