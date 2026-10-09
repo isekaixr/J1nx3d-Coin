@@ -40,9 +40,24 @@
     </label>
   </div>
 
+  <div id="marketBar" class="marketbar glass">
+    <span id="fng">😨 Fear & Greed : …</span>
+    <span id="btcDom">₿ BTC : …</span>
+    <span class="hint">pas une machine à cash : le marché donne, le marché reprend ☩</span>
+  </div>
+
   <div id="topPick" class="toppick glass">
     <span class="toppick-title">🔥 Sur quoi miser :</span>
     <span id="pickChips">analyse…</span>
+  </div>
+
+  <div class="screener glass">
+    <div class="screener-head">
+      <b>🫧 Bubble map — les plus chaudes (24h, Binance spot USDT)</b>
+      <button id="bubbleRefresh">🔄</button>
+    </div>
+    <div id="bubble" class="bubble">chargement…</div>
+    <div class="hint">Taille = volume, couleur = perf 24h. Clic = charger la devise dans le radar. Les stablecoins sont exclus.</div>
   </div>
 
   <div id="signal" class="signal glass wait">

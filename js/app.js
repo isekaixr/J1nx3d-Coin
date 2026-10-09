@@ -295,6 +295,9 @@ function draw() {
     ctx.fillText(label, x - 10, y);
   }
 
+  // 📈 EMA + RSI overlay
+  try { drawIndicators(all, candleWidth, width, height, padding, min, scale); } catch { /* silencieux */ }
+
   // ⚖️ risk overlay (Entry/SL/TP horizon actif)
   if (riskLevels) {
     const levels = [
@@ -539,7 +542,7 @@ function computeSignal() {
   riskLevels = { entry: price, sl, tp: tp1, horizon: activeHorizon, direction: dir };
 }
 
-setInterval(computeSignal, 2000);
+setInterval(() => { try { computeSignal(); } catch {} }, 2000);
 
 // 🏆 TOP PICK — sur quoi miser (score 24h Binance)
 const PAIRS24 = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
@@ -575,6 +578,137 @@ async function refreshTopPick() {
 }
 setInterval(refreshTopPick, 30000);
 refreshTopPick();
+
+// 🫧 BUBBLE SCREENER — top USDT 24h façon crypto-bubble (clic = charger)
+const STABLES = ["USDT", "USDC", "FDUSD", "TUSD", "DAI", "USDD", "BUSD"];
+async function refreshBubble() {
+  const el = document.getElementById("bubble");
+  if (!el) return;
+  try {
+    const res = await fetch("https://api.binance.com/api/v3/ticker/24hr");
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const arr = await res.json();
+    const spot = arr
+      .filter((t) => t.symbol.endsWith("USDT") && !STABLES.some((s) => t.symbol.startsWith(s)))
+      .map((t) => ({ s: t.symbol, chg: parseFloat(t.priceChangePercent), vol: parseFloat(t.quoteVolume) }))
+      .filter((t) => isFinite(t.chg) && isFinite(t.vol) && t.vol > 1000000)
+      .sort((a, b) => b.vol - a.vol)
+      .slice(0, 40)
+      .sort((a, b) => b.chg - a.chg);
+    const vols = spot.map((x) => Math.log10(x.vol));
+    const vMin = Math.min(...vols), vMax = Math.max(...vols);
+    el.innerHTML = "";
+    spot.forEach((x) => {
+      const size = 12 + ((Math.log10(x.vol) - vMin) / (vMax - vMin || 1)) * 22;
+      const chg = Math.max(-10, Math.min(10, x.chg));
+      // rouge → vert via jaune
+      const hue = chg >= 0 ? 140 : 0;
+      const light = 35 + Math.min(25, Math.abs(chg) * 2);
+      const b = document.createElement("button");
+      b.className = "bub";
+      b.style.fontSize = size + "px";
+      b.style.background = `hsl(${chg >= 0 ? 140 : 0} 70% ${chg >= 0 ? 45 + Math.min(20, chg) : 60}%)`;
+      b.innerHTML = `${x.s.replace("USDT", "")}<small>${x.chg >= 0 ? "+" : ""}${x.chg.toFixed(1)}%</small>`;
+      b.title = `${x.s} : ${x.chg.toFixed(2)}% / vol ${(x.vol / 1e6).toFixed(1)}M`;
+      b.addEventListener("click", () => loadPair(x.s.toLowerCase()));
+      el.appendChild(b);
+    });
+  } catch (e) {
+    el.innerText = "bubble indisponible (réseau) — réessaie 🔄";
+  }
+}
+function loadPair(p) {
+  currentPair = p;
+  // ajoute l'option au select si absente (n'importe quel spot Binance marche en WS)
+  if (![...select.options].some((o) => o.value === p)) {
+    const o = document.createElement("option");
+    o.value = p;
+    o.textContent = p.replace("usdt", "").toUpperCase() + "/USDT";
+    select.appendChild(o);
+  }
+  select.value = p;
+  connect(p);
+  refreshTopPick();
+}
+document.getElementById("bubbleRefresh")?.addEventListener("click", refreshBubble);
+setInterval(refreshBubble, 60000);
+refreshBubble();
+
+// 🌍 MARKET BAR — Fear & Greed (gratuit) + BTC 24h
+async function refreshMarketBar() {
+  try {
+    const f = await fetch("https://api.alternative.me/fng/?limit=1&format=json").then((r) => r.json());
+    const v = f?.data?.[0];
+    if (v) {
+      const label = { "Extreme Fear": "😱 Peur extrême", Fear: "😨 Peur", Neutral: "😐 Neutre", Greed: "🤑 Gourmandise", "Extreme Greed": "🤪 Euphorie" }[v.value_classification] || v.value_classification;
+      document.getElementById("fng").innerText = `😨 Fear & Greed : ${v.value} — ${label}`;
+    }
+  } catch { document.getElementById("fng").innerText = "😨 Fear & Greed : n/a"; }
+  try {
+    const b = await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT').then((r) => r.json());
+    document.getElementById("btcDom").innerText = `₿ BTC ${parseFloat(b.lastPrice).toLocaleString("fr-FR", { maximumFractionDigits: 0 })}€-eq ${parseFloat(b.priceChangePercent) >= 0 ? "🟢" : "🔴"} ${parseFloat(b.priceChangePercent).toFixed(1)}% (24h)`;
+  } catch { /* silencieux */ }
+}
+setInterval(refreshMarketBar, 60000);
+refreshMarketBar();
+
+// 📈 INDICATEURS — EMA12/26 + RSI14 (façon TradingView, light)
+function emaArr(values, period) {
+  if (values.length < period) return [];
+  const k = 2 / (period + 1);
+  const out = [];
+  let e = values.slice(0, period).reduce((a, b) => a + b, 0) / period;
+  for (let i = period; i < values.length; i++) { e = values[i] * k + e * (1 - k); out.push(e); }
+  return out;
+}
+function rsi14(closes) {
+  if (closes.length < 15) return null;
+  let g = 0, l = 0;
+  for (let i = closes.length - 14; i < closes.length; i++) {
+    const d = closes[i] - closes[i - 1];
+    if (d >= 0) g += d; else l -= d;
+  }
+  if (l === 0) return 100;
+  const rs = (g / 14) / (l / 14);
+  return 100 - 100 / (1 + rs);
+}
+function drawIndicators(all, candleWidth, width, height, padding, min, scale) {
+  const closes = all.map((c) => c.close);
+  const e12 = emaArr(closes, 12), e26 = emaArr(closes, 26);
+  const line = (arr, offset, color) => {
+    if (!arr.length) return;
+    ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.beginPath();
+    arr.forEach((v, j) => {
+      const i = j + offset;
+      const x = i * candleWidth + 20;
+      const y = height - padding - (v - min) * scale;
+      j === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.stroke(); ctx.lineWidth = 1;
+  };
+  line(e12, closes.length - e12.length, "#38bdf8");
+  line(e26, closes.length - e26.length, "#facc15");
+  const rsi = rsi14(closes);
+  if (rsi != null) {
+    ctx.fillStyle = rsi > 70 ? "#ef4444" : rsi < 30 ? "#22c55e" : "#94a3b8";
+    ctx.font = "bold 12px Arial";
+    ctx.fillText(`RSI14 ${rsi.toFixed(0)}${rsi > 70 ? " ⚠️ suracheté" : rsi < 30 ? " 💎 survendu" : ""}  |  EMA12/26`, 12, 18);
+  }
+  return rsi;
+}
+const _origCompute = computeSignal;
+computeSignal = function () {
+  _origCompute();
+  try {
+    const all = currentCandle ? [...candles, currentCandle] : [...candles];
+    if (all.length < 15) return;
+    const rsi = rsi14(all.map((c) => c.close));
+    if (rsi == null) return;
+    const why = document.getElementById("signalWhy");
+    const tag = rsi > 70 ? " — RSI suracheté : pump fatigué, méfiance." : rsi < 30 ? " — RSI survendu : dump fatigué, rebond possible." : "";
+    if (tag && !why.innerText.includes("RSI")) why.innerText += tag;
+  } catch { /* silencieux */ }
+};
 
 // 🚀 init
 connect(currentPair);
