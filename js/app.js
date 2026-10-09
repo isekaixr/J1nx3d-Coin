@@ -597,19 +597,26 @@ async function refreshBubble() {
       .sort((a, b) => b.chg - a.chg);
     const vols = spot.map((x) => Math.log10(x.vol));
     const vMin = Math.min(...vols), vMax = Math.max(...vols);
+    // 🏆 TOP 5 à miser : score = mouvement × volume, gainers d'abord
+    const scored = spot.map((x) => ({ ...x, score: Math.abs(x.chg) * Math.log10(x.vol + 10) }));
+    const gainers = scored.filter((x) => x.chg > 0).sort((a, b) => b.score - a.score);
+    const pool = (gainers.length >= 7 ? gainers : scored.sort((a, b) => b.score - a.score)).slice(0, 7);
+    const medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣"];
+    const pickEl = document.getElementById("bubblePick");
+    if (pickEl) {
+      pickEl.innerText = "⭐ Top 7 : " + pool.map((x, i) => `${medals[i]} ${x.s.replace("USDT", "")} ${x.chg >= 0 ? "+" : ""}${x.chg.toFixed(1)}%`).join("  ");
+    }
     el.innerHTML = "";
     spot.forEach((x) => {
       const size = 12 + ((Math.log10(x.vol) - vMin) / (vMax - vMin || 1)) * 22;
-      const chg = Math.max(-10, Math.min(10, x.chg));
-      // rouge → vert via jaune
-      const hue = chg >= 0 ? 140 : 0;
-      const light = 35 + Math.min(25, Math.abs(chg) * 2);
+      const rank = pool.findIndex((p) => p.s === x.s);
+      const isTop = rank !== -1;
       const b = document.createElement("button");
-      b.className = "bub";
+      b.className = "bub" + (isTop ? " top" : "");
       b.style.fontSize = size + "px";
-      b.style.background = `hsl(${chg >= 0 ? 140 : 0} 70% ${chg >= 0 ? 45 + Math.min(20, chg) : 60}%)`;
-      b.innerHTML = `${x.s.replace("USDT", "")}<small>${x.chg >= 0 ? "+" : ""}${x.chg.toFixed(1)}%</small>`;
-      b.title = `${x.s} : ${x.chg.toFixed(2)}% / vol ${(x.vol / 1e6).toFixed(1)}M`;
+      b.style.background = `hsl(${x.chg >= 0 ? 140 : 0} 70% ${x.chg >= 0 ? 45 + Math.min(20, x.chg) : 60}%)`;
+      b.innerHTML = `${isTop ? medals[rank] + " " : ""}${x.s.replace("USDT", "")}<small>${x.chg >= 0 ? "+" : ""}${x.chg.toFixed(1)}%</small>`;
+      b.title = `${isTop ? "TOP " + (rank + 1) + " à miser — " : ""}${x.s} : ${x.chg.toFixed(2)}% / vol ${(x.vol / 1e6).toFixed(1)}M — clic = charger`;
       b.addEventListener("click", () => loadPair(x.s.toLowerCase()));
       el.appendChild(b);
     });

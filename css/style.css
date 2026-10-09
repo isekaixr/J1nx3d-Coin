@@ -74,6 +74,8 @@ body {
   transition: transform 0.15s;
 }
 .bub:hover { transform: scale(1.07); }
+.bub.top { border: 2px solid var(--gold); box-shadow: 0 0 14px rgba(250,204,21,0.55); }
+.bubble-pick { color: var(--gold); font-weight: bold; font-size: 13px; }
 .bub small { display: block; font-weight: normal; opacity: 0.85; }
 .toppick { padding: 10px 16px; margin-bottom: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .toppick-title { font-weight: bold; color: var(--gold); }
