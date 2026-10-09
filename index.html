@@ -2,28 +2,134 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <title>Smart Money Binance Chart</title>
-
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>☩ Nova Terminal — Smart Money</title>
   <link rel="stylesheet" href="./css/style.css" />
 </head>
-
 <body>
 
-<h1>🧠 Smart Money Live Chart</h1>
+<header class="hero">
+  <div class="hero-left">
+    <h1>☩ Nova Terminal</h1>
+    <p class="sub">Smart Money radar — le tool te dit <b>START / STOP / TARGET</b> en direct. Pédagogique, pas un conseil financier.</p>
+  </div>
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="crypto">🪙 Crypto live</button>
+    <button class="tab-btn" data-tab="bourse">🏛️ Bourse — mes actifs</button>
+  </nav>
+</header>
 
-<select id="pairSelect">
-  <option value="btcusdt">BTC/USDT</option>
-  <option value="ethusdt">ETH/USDT</option>
-  <option value="solusdt">SOL/USDT</option>
-</select>
+<section id="tab-crypto">
+  <div class="toolbar glass">
+    <label>Devise
+      <select id="pairSelect">
+        <option value="btcusdt">BTC/USDT</option>
+        <option value="ethusdt">ETH/USDT</option>
+        <option value="solusdt">SOL/USDT</option>
+      </select>
+    </label>
+    <label>💰 Capital (€) <input id="capital" type="number" value="1000" min="10" step="10" /></label>
+    <label>🎯 Risque (%) <input id="riskPct" type="number" value="1" min="0.1" max="5" step="0.1" /></label>
+    <label>Levier <input id="leverage" type="number" value="1" min="1" max="5" step="1" /></label>
+    <label>Sens
+      <select id="direction">
+        <option value="auto" selected>Auto 🤖</option>
+        <option value="long">Long 🟢</option>
+        <option value="short">Short 🔴</option>
+      </select>
+    </label>
+  </div>
 
-<div id="status">⚪ En attente...</div>
-<div id="state">📊 Market state: ...</div>
-<div id="flow">📈 Flow: ...</div>
+  <div id="topPick" class="toppick glass">
+    <span class="toppick-title">🔥 Sur quoi miser :</span>
+    <span id="pickChips">analyse…</span>
+  </div>
 
-<canvas id="chart" width="1000" height="400"></canvas>
+  <div id="signal" class="signal glass wait">
+    <div class="signal-top">
+      <div id="signalAction" class="signal-action">⏳ Analyse…</div>
+      <div class="conf-wrap"><div id="confBar" class="conf-bar"></div><span id="confTxt"></span></div>
+    </div>
+    <div id="signalPattern" class="signal-pattern">—</div>
+    <div class="signal-grid">
+      <div>🟢 <b>START</b><br><span id="sEntry">—</span></div>
+      <div>🔴 <b>STOP</b><br><span id="sStop">—</span></div>
+      <div>🎯 <b>TARGET 1</b><br><span id="sTp1">—</span></div>
+      <div>🚀 <b>TARGET 2</b><br><span id="sTp2">—</span></div>
+      <div>📦 <b>SIZE</b><br><span id="sSize">—</span></div>
+    </div>
+    <div id="signalWhy" class="signal-why">Je lis le flow live…</div>
+  </div>
+
+  <div class="live-row">
+    <div id="status">⚪ En attente...</div>
+    <div id="state">📊 Market state: ...</div>
+    <div id="flow">📈 Flow: ...</div>
+  </div>
+
+  <button id="riskBtn">⚖️ Risk Management détaillé</button>
+
+  <div id="riskPanel" hidden>
+    <div class="risk-settings">
+      <span class="hint">Capital/risque/levier ci-dessus = utilisés partout. Ici : horizons.</span>
+    </div>
+    <div class="risk-horizons">
+      <button class="horizon-btn active" data-horizon="court">Court</button>
+      <button class="horizon-btn" data-horizon="moyen">Moyen</button>
+      <button class="horizon-btn" data-horizon="long">Long</button>
+    </div>
+    <div class="risk-cards">
+      <div class="risk-card" data-horizon="court">
+        <h3>⚡ Court <small>(5 bougies, RR <input id="rrCourt" type="number" value="1.5" step="0.1" min="0.5" />)</small></h3>
+        <div class="risk-values" id="riskCourt">En attente de données…</div>
+      </div>
+      <div class="risk-card" data-horizon="moyen">
+        <h3>🌊 Moyen <small>(20 bougies, RR <input id="rrMoyen" type="number" value="2" step="0.1" min="0.5" />)</small></h3>
+        <div class="risk-values" id="riskMoyen">En attente de données…</div>
+      </div>
+      <div class="risk-card" data-horizon="long">
+        <h3>🏛️ Long <small>(50 bougies, RR <input id="rrLong" type="number" value="3" step="0.1" min="0.5" />)</small></h3>
+        <div class="risk-values" id="riskLong">En attente de données…</div>
+      </div>
+    </div>
+    <div class="risk-note">Base = range moyen (ATR simplifié). Indicatif, pas un conseil financier ☩</div>
+  </div>
+
+  <canvas id="chart" width="1000" height="400"></canvas>
+  <p class="hint">Logique du radar : gros achats répétés → prix monte (banques/clients poussent), puis prise de profit → ça redescend. Le signal détecte : pression buy/sell, baleines (gros trades), vitesse. START = où entrer, STOP = où sortir si ça tourne mal, TARGET = où prendre le gain. Si c'est calme ou piégeux → ATTENDRE.</p>
+</section>
+
+<section id="tab-bourse" hidden>
+  <h2>🏛️ Mes actifs — Bourse Europe</h2>
+  <p class="hint">Exemple Airbus : ticker <code>AIR.PA</code>, Qté 10, 💰 PRU 175€, 🏷️ prix actuel 187,96€ (relevé 09/10/2026) → +129,60€. Prix auto Yahoo quand dispo, sinon 100% manuel.</p>
+
+  <div class="bourse-form">
+    <label>💰 PRU — mon coût (€) <input id="bPru" type="number" value="175" min="0" step="0.01" /></label>
+    <label>🏷️ Prix actuel (€) <input id="bManual" type="number" value="187.96" min="0" step="0.01" /></label>
+    <label>Ticker <input id="bTicker" placeholder="AIR.PA" value="AIR.PA" /></label>
+    <label>Qté <input id="bQty" type="number" value="10" min="0.01" step="0.01" /></label>
+    <label>Rdt % <input id="bRate" type="number" value="7" step="0.5" /></label>
+    <button id="bAdd">➕ Ajouter</button>
+    <button id="bRefresh">🔄 Refresh</button>
+  </div>
+  <div class="hint">💰 <b>PRU</b> = ce que tu as payé (fixe). 🏷️ <b>Prix actuel</b> = valeur aujourd'hui. P&L = (Prix − PRU) × Qté ☩</div>
+
+  <div id="bTotal">💼 Total : …</div>
+  <table id="bTable">
+    <thead>
+      <tr>
+        <th>Ticker</th><th>Qté</th><th>💰 PRU</th><th>🏷️ Prix</th>
+        <th>Valeur</th><th>P&L</th>
+        <th>⚡Court</th><th>🌊Moyen</th><th>🏛️Long</th>
+        <th>3a / 6a / 12a</th><th></th>
+      </tr>
+    </thead>
+    <tbody id="bBody"><tr><td colspan="11">Ajoute ta première ligne ☩ (ex AIR.PA x10)</td></tr></tbody>
+  </table>
+  <div class="risk-note">Bourse au comptant : pas de levier, horizon long. Indicatif, pas un conseil financier ☩</div>
+</section>
 
 <script src="./js/app.js"></script>
-
+<script src="./js/bourse.js"></script>
 </body>
 </html>
